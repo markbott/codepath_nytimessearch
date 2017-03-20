@@ -88,7 +88,7 @@ public class SearchActivity extends AppCompatActivity {
     public void onArticleSearch(View view) {
         query = etQuery.getText().toString();
         Toast.makeText(this, "Search for " + query, Toast.LENGTH_LONG).show();
-        loadPage(0);
+        loadPage(1);
     }
 
     boolean loadPage(final int page) {
@@ -98,45 +98,49 @@ public class SearchActivity extends AppCompatActivity {
             return false;
         }
 
-        if((hits != null && hits.intValue() >= 10 * page) || page >= 120) {
-            Log.d("DEBUG", "Ignoring request since it's for a page that cannot be retrieved.");
+        if((hits != null && hits.intValue() <= 10 * (page-1)) || page > 120) {
+            Log.d("DEBUG", "Ignoring request since it's for a page that cannot be retrieved.  hits=" + hits);
             return false;
         }
 
-        AsyncHttpClient client = new AsyncHttpClient();
-        String url = "https://api.nytimes.com/svc/search/v2/articlesearch.json";
-        RequestParams parms = new RequestParams();
-        parms.put("api-key", "23bf04f4282a48f3b9c3bf362a934101");
-        parms.put("page", page);
-        parms.put("q", query);
+        try {
+            AsyncHttpClient client = new AsyncHttpClient();
+            String url = "https://api.nytimes.com/svc/search/v2/articlesearch.json";
+            RequestParams parms = new RequestParams();
+            parms.put("api-key", "23bf04f4282a48f3b9c3bf362a934101");
+            parms.put("page", page - 1);
+            parms.put("q", query);
 
-        Log.d("DEBUG", "Executing GET");
-        client.get(url, parms, new JsonHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
-                super.onSuccess(statusCode, headers, response);
-                Log.d("DEBUG", "Response for page " + page + ": " + response.toString());
-                JSONArray jsonArticles = null;
+            Log.d("DEBUG", "Executing GET");
+            client.get(url, parms, new JsonHttpResponseHandler() {
+                @Override
+                public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                    super.onSuccess(statusCode, headers, response);
+                    Log.d("DEBUG", "Response for page " + page + ": " + response.toString());
+                    JSONArray jsonArticles = null;
 
-                try {
-                    hits = response.getJSONObject("response").getJSONObject("meta").getInt("hits");
-                    Log.d("DEBUG", "Search hits " + hits);
+                    try {
+                        hits = response.getJSONObject("response").getJSONObject("meta").getInt("hits");
+                        Log.d("DEBUG", "Search hits " + hits);
 
-                    jsonArticles = response.getJSONObject("response").getJSONArray("docs");
-                    adapter.addAll(Article.fromJSONArray(jsonArticles));
-                    Log.d("DEBUG", "Now have " + articles.size() + " articles");
-                } catch(JSONException je) {
-                    Log.e("ERROR", "Error parsing article search results", je);
+                        jsonArticles = response.getJSONObject("response").getJSONArray("docs");
+                        adapter.addAll(Article.fromJSONArray(jsonArticles));
+                        Log.d("DEBUG", "Now have " + articles.size() + " articles");
+                    } catch (JSONException je) {
+                        Log.e("ERROR", "Error parsing article search results", je);
+                    }
                 }
-            }
 
-            @Override
-            public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
-                super.onFailure(statusCode, headers, responseString, throwable);
-                Log.e("ERROR", responseString);
-            }
-        });
-
+                @Override
+                public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
+                    super.onFailure(statusCode, headers, responseString, throwable);
+                    Log.e("ERROR", responseString);
+                }
+            });
+        } catch(Exception e) {
+            Log.e("ERROR", "Error querying backend", e);
+            return false;
+        }
         return true;
     }
 
